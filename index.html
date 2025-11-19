@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8" />
+  <title>Simple Inventory – Mobil törzsadatbevitel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root{
+      --bg:#0f172a;
+      --card:#ffffff;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --line:#e2e8f0;
+      --accent:#0f172a;
+      --ok:#16a34a;
+      --warn:#dc2626;
+      --backdrop:rgba(15,23,42,.85);
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;
+      background:radial-gradient(circle at top,#1e293b,#020617);
+      color:#e5e7eb;
+      min-height:100vh;
+      display:flex;
+      align-items:stretch;
+      justify-content:center;
+      padding:16px;
+    }
+    .app{
+      width:100%;
+      max-width:480px;
+      margin:auto;
+      background:linear-gradient(145deg,#0f172a,#020617);
+      border-radius:24px;
+      padding:16px 16px 20px;
+      box-shadow:0 18px 40px rgba(0,0,0,.6);
+      border:1px solid rgba(148,163,184,.35);
+      position:relative;
+      overflow:hidden;
+    }
+    .app::before{
+      content:"";
+      position:absolute;
+      inset:-40%;
+      background:
+        radial-gradient(circle at 0% 0%,rgba(59,130,246,.3),transparent 55%),
+        radial-gradient(circle at 100% 0%,rgba(16,185,129,.3),transparent 55%),
+        radial-gradient(circle at 50% 120%,rgba(251,191,36,.25),transparent 55%);
+      opacity:.9;
+      pointer-events:none;
+      z-index:-1;
+    }
+
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:12px;
+    }
+    .logo{
+      width:40px;
+      height:40px;
+      border-radius:16px;
+      background:conic-gradient(from 200deg,#0ea5e9,#22c55e,#eab308,#0ea5e9);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:700;
+      color:#020617;
+      box-shadow:0 10px 26px rgba(59,130,246,.6);
+      font-size:22px;
+    }
+    h1{
+      font-size:19px;
+      margin:0;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      color:#f9fafb;
+    }
+    .subtitle{
+      margin:2px 0 0;
+      font-size:12px;
+      color:#9ca3af;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 9px;
+      border-radius:999px;
+      background:rgba(15,23,42,.7);
+      color:#e5e7eb;
+      font-size:11px;
+      border:1px solid rgba(148,163,184,.5);
+    }
+    .chip span.dot{
+      width:7px;
+      height:7px;
+      border-radius:999px;
+      background:#22c55e;
+      box-shadow:0 0 0 4px rgba(34,197,94,.25);
+    }
+
+    .card{
+      background:rgba(15,23,42,.90);
+      border-radius:18px;
+      padding:14px 12px 14px;
+      border:1px solid rgba(148,163,184,.45);
+      box-shadow:0 14px 30px rgba(15,23,42,.75);
+      backdrop-filter:blur(18px);
+    }
+    h2{
+      margin:0 0 4px;
+      font-size:15px;
+      color:#e5e7eb;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    h2 span.badge{
+      font-size:11px;
+      padding:2px 7px;
+      border-radius:999px;
+      background:rgba(148,163,184,.14);
+      color:#9ca3af;
+    }
+    p.muted{
+      margin:0 0 10px;
+      font-size:12px;
+      color:#9ca3af;
+    }
+
+    label{
+      display:block;
+      font-size:12px;
+      color:#9ca3af;
+      margin:6px 0 3px;
+    }
+    input{
+      width:100%;
+      padding:9px 10px;
+      font-size:14px;
+      border-radius:12px;
+      border:1px solid rgba(55,65,81,.9);
+      background:rgba(15,23,42,.9);
+      color:#e5e7eb;
+    }
+    input::placeholder{color:#6b7280;}
+    input:focus{
+      outline:none;
+      border-color:#38bdf8;
+      box-shadow:0 0 0 1px rgba(56,189,248,.6);
+      background:#020617;
+    }
+    .row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .row > *{flex:1;}
+    .row .grow0{flex:0 0 auto;}
+
+    .btn{
+      border:none;
+      border-radius:999px;
+      padding:9px 13px;
+      font-size:13px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      cursor:pointer;
+      background:#f9fafb;
+      color:#020617;
+      font-weight:500;
+      box-shadow:0 10px 20px rgba(15,23,42,.7);
+      transition:.16s;
+      white-space:nowrap;
+    }
+    .btn span.icon{font-size:14px;}
+    .btn.primary{
+      background:#22c55e;
+      color:#022c22;
+      box-shadow:0 10px 22px rgba(34,197,94,.6);
+    }
+    .btn.secondary{
+      background:rgba(15,23,42,.9);
+      color:#e5e7eb;
+      border:1px solid rgba(148,163,184,.55);
+      box-shadow:0 8px 18px rgba(15,23,42,.7);
+    }
+    .btn.ghost{
+      background:transparent;
+      color:#e5e7eb;
+      border:1px solid rgba(148,163,184,.5);
+      box-shadow:none;
+    }
+    .btn.small{
+      padding:7px 9px;
+      font-size:12px;
+    }
+    .btn:disabled{
+      opacity:.6;
+      cursor:default;
+      box-shadow:none;
+      transform:none;
+    }
+    .btn:not(:disabled):active{
+      transform:translateY(1px) scale(.98);
+      box-shadow:0 4px 10px rgba(0,0,0,.6);
+    }
+
+    .error-box{
+      margin-top:10px;
+      padding:8px 10px;
+      border-radius:12px;
+      background:rgba(248,113,113,.14);
+      border:1px solid rgba(248,113,113,.8);
+      color:#fecaca;
+      font-size:13px;
+      display:none;
+      align-items:flex-start;
+      gap:8px;
+    }
+    .error-box.show{display:flex;}
+    .error-box span.icon{margin-top:1px;}
+    .error-box strong{display:block;font-size:13px;}
+
+    .info-line{
+      margin-top:8px;
+      font-size:11px;
+      color:#9ca3af;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:3px 7px;
+      border-radius:999px;
+      font-size:11px;
+      background:rgba(15,23,42,.8);
+      color:#9ca3af;
+      border:1px solid rgba(148,163,184,.5);
+    }
+    .pill.ok span.dot{
+      width:5px;height:5px;border-radius:999px;background:#22c55e;
+    }
+
+    .list{
+      margin-top:10px;
+      border-radius:14px;
+      border:1px solid rgba(55,65,81,.9);
+      background:rgba(15,23,42,.8);
+      max-height:190px;
+      overflow:auto;
+      padding:4px 0;
+    }
+    .list-item{
+      padding:7px 10px;
+      border-bottom:1px solid rgba(31,41,55,.9);
+      font-size:12px;
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+    .list-item:last-child{border-bottom:none;}
+    .list-item span.name{color:#e5e7eb;}
+    .list-item span.meta{color:#9ca3af;font-size:11px;}
+    .list-item span.meta code{
+      font-family:ui-monospace,Menlo,Consolas,monospace;
+      font-size:11px;
+      background:rgba(15,23,42,.9);
+      padding:1px 5px;
+      border-radius:999px;
+      border:1px solid rgba(55,65,81,1);
+    }
+
+    .stamp{
+      margin-top:10px;
+      text-align:center;
+      font-size:11px;
+      color:#9ca3af;
+    }
+
+    .hide{display:none!important;}
+
+    /* Scanner modal */
+    .backdrop{
+      position:fixed;
+      inset:0;
+      background:var(--backdrop);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:40;
+      padding:16px;
+    }
+    .backdrop.show{
+      display:flex;
+    }
+    .scan-modal{
+      width:100%;
+      max-width:420px;
+      background:#020617;
+      border-radius:20px;
+      border:1px solid rgba(148,163,184,.7);
+      box-shadow:0 20px 45px rgba(0,0,0,.8);
+      overflow:hidden;
+    }
+    .scan-modal header{
+      padding:10px 14px;
+      border-bottom:1px solid rgba(31,41,55,1);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .scan-modal h3{
+      margin:0;
+      font-size:14px;
+      color:#e5e7eb;
+    }
+    .scan-modal header small{
+      font-size:11px;
+      color:#9ca3af;
+    }
+    .scan-modal .body{
+      padding:10px 10px 12px;
+    }
+    #scan-video{
+      width:100%;
+      max-height:320px;
+      border-radius:14px;
+      background:#000;
+    }
+    .scan-modal p{
+      margin:6px 2px 2px;
+      font-size:11px;
+      color:#9ca3af;
+    }
+    .scan-modal footer{
+      padding:9px 12px 10px;
+      border-top:1px solid rgba(31,41,55,1);
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="row" style="align-items:center;gap:10px;">
+        <div class="logo">Si</div>
+        <div>
+          <h1>Mobil törzsadat</h1>
+          <p class="subtitle">Termék + vonalkód rögzítés – közös Firestore</p>
+        </div>
+      </div>
+      <div class="chip">
+        <span class="dot"></span>
+        <span>Online szinkron</span>
+      </div>
+    </header>
+
+    <main class="card">
+      <h2>
+        Új termék rögzítése
+        <span class="badge">csak törzsadat</span>
+      </h2>
+      <p class="muted">
+        Itt csak termékeket / vonalkódokat rögzítesz. Ugyanabba az adatbázisba ment, mint a “nagy” rendszer –
+        a cikkszám egyszer szerepelhet összesen.
+      </p>
+
+      <div id="err" class="error-box">
+        <span class="icon">⚠️</span>
+        <div>
+          <strong>Hiba a rögzítésnél</strong>
+          <span id="err-text"></span>
+        </div>
+      </div>
+
+      <form id="form-prod" autocomplete="off">
+        <label>Cikkszám / vonalkód</label>
+        <div class="row">
+          <input id="prod-sku" placeholder="Beolvasás vagy kézi beírás" inputmode="numeric" />
+          <button class="btn secondary small grow0" type="button" id="btn-scan">
+            <span class="icon">📷</span>
+            Olvasás
+          </button>
+        </div>
+
+        <label>Megnevezés</label>
+        <input id="prod-name" placeholder="Termék megnevezése" required />
+
+        <div class="row">
+          <div>
+            <label>Mértékegység</label>
+            <input id="prod-unit" value="db" />
+          </div>
+          <div>
+            <label>Min. készlet (opcionális)</label>
+            <input id="prod-min" type="number" inputmode="decimal" value="0" />
+          </div>
+        </div>
+
+        <div style="margin-top:12px;" class="row">
+          <button class="btn primary" type="submit" id="btn-save">
+            <span class="icon">💾</span>
+            Mentés
+          </button>
+          <button class="btn ghost" type="button" id="btn-clear">
+            Törlés
+          </button>
+        </div>
+      </form>
+
+      <div class="info-line">
+        <span class="pill ok">
+          <span class="dot"></span>
+          Duplikált cikkszám esetén figyelmeztetés – akár mobilról, akár a nagy rendszerről jött.
+        </span>
+        <span id="prod-count" class="muted">Termékek: –</span>
+      </div>
+
+      <div class="list" id="list-last">
+        <!-- Utolsó termékek ide kerülnek -->
+      </div>
+
+      <div class="stamp">
+        <span id="stamp"></span>
+      </div>
+    </main>
+  </div>
+
+  <!-- Vonalkód / QR olvasó modál -->
+  <div id="scan-backdrop" class="backdrop" aria-hidden="true">
+    <div class="scan-modal" role="dialog" aria-modal="true" aria-labelledby="scan-title">
+      <header>
+        <div>
+          <h3 id="scan-title">Kód beolvasása</h3>
+          <small>Irányítsd a kamerát a vonalkódra vagy QR-kódra.</small>
+        </div>
+        <button class="btn ghost small" type="button" id="scan-close">Mégse</button>
+      </header>
+      <div class="body">
+        <video id="scan-video" autoplay muted playsinline></video>
+        <p>A beolvasott kód automatikusan bekerül a cikkszám mezőbe, az olvasás leáll.</p>
+      </div>
+      <footer>
+        <button class="btn secondary small" type="button" id="scan-cancel">Bezárás</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ZXing - vonalkód / QR könyvtár -->
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+  <!-- Firebase + app logika -->
+  <script type="module">
+    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, onSnapshot, query, orderBy,
+      enableIndexedDbPersistence
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import {
+      getAuth, signInAnonymously, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    // UGYANAZ a config, mint a “nagy” rendszerben
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeoxtOe5Cleasm3KdeSHP9WDR3PkU-N1I",
+      authDomain: "mosas-nyilvantartas.firebaseapp.com",
+      projectId: "mosas-nyilvantartas",
+      storageBucket: "mosas-nyilvantartas.appspot.com",
+      messagingSenderId: "38259241645",
+      appId: "1:38259241645:web:26070b1d0686def9f00c24",
+    };
+
+    if (!getApps().length) {
+      initializeApp(firebaseConfig);
+    }
+    const db = getFirestore();
+    enableIndexedDbPersistence(db).catch(()=>{});
+
+    const auth = getAuth();
+    onAuthStateChanged(auth, (user)=>{
+      if(!user){
+        signInAnonymously(auth).catch(e => showErr("Anonim bejelentkezés sikertelen: " + (e?.message || e)));
+      }
+    });
+
+    const COL_PRODUCTS = "mosas_products";
+
+    const $  = (sel) => document.querySelector(sel);
+    const fmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 2 });
+
+    const errBox  = $("#err");
+    const errText = $("#err-text");
+
+    function showErr(msg){
+      if(!errBox) return;
+      errText.textContent = String(msg || "Ismeretlen hiba");
+      errBox.classList.add("show");
+    }
+    function hideErr(){
+      if(!errBox) return;
+      errBox.classList.remove("show");
+    }
+
+    // Időbélyeg a láblécben
+    const stampEl = $("#stamp");
+    if(stampEl){
+      const now = new Date();
+      stampEl.textContent = "Csatlakozva a Firestore-hoz – " +
+        now.toLocaleString("hu-HU");
+    }
+
+    let products = [];
+
+    // Realtime terméklista – közös adatbázis a nagy rendszerrel
+    onSnapshot(
+      query(collection(db, COL_PRODUCTS), orderBy("name")),
+      (snap)=>{
+        products = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        renderLastProducts();
+      },
+      (err)=> showErr("Terméklista szinkron hiba: " + (err?.message || err))
+    );
+
+    function renderLastProducts(){
+      const box = $("#list-last");
+      const cnt = $("#prod-count");
+      if(!box || !cnt) return;
+
+      cnt.textContent = "Termékek: " + products.length;
+
+      box.innerHTML = "";
+      const last = products.slice(-20).reverse(); // utolsó 20
+
+      if(!last.length){
+        const p = document.createElement("div");
+        p.className = "list-item";
+        p.innerHTML = "<span class='meta'>Még nincs termék rögzítve ebben az adatbázisban.</span>";
+        box.appendChild(p);
+        return;
+      }
+
+      last.forEach(p=>{
+        const div = document.createElement("div");
+        div.className = "list-item";
+        const sku = p.sku || "";
+        const metaParts = [];
+        if(sku) metaParts.push(`kód: <code>${escapeHtml(sku)}</code>`);
+        metaParts.push(`ME: ${escapeHtml(p.unit || "db")}`);
+        metaParts.push(`min: ${p.min ?? 0}`);
+        div.innerHTML = `
+          <span class="name">${escapeHtml(p.name || "")}</span>
+          <span class="meta">${metaParts.join(" • ")}</span>
+        `;
+        box.appendChild(div);
+      });
+    }
+
+    function escapeHtml(str){
+      return String(str || "").replace(/[&<>\"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"
+      }[c] || c));
+    }
+
+    // Űrlap kezelése
+    const form    = $("#form-prod");
+    const inpSku  = $("#prod-sku");
+    const inpName = $("#prod-name");
+    const inpUnit = $("#prod-unit");
+    const inpMin  = $("#prod-min");
+    const btnSave = $("#btn-save");
+    const btnClr  = $("#btn-clear");
+
+    form.addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      hideErr();
+
+      const sku  = (inpSku.value || "").trim();
+      const name = (inpName.value || "").trim();
+      const unit = (inpUnit.value || "").trim() || "db";
+      const min  = Number(inpMin.value || 0);
+
+      if(!name){
+        showErr("Adj meg megnevezést a terméknek!");
+        return;
+      }
+
+      // Duplikált cikkszám ellenőrzés – AZ EGÉSZ ADATBÁZISRA
+      if (sku) {
+        const normalizedSku = sku.toLowerCase();
+        const existsSku = products.some(p =>
+          String(p.sku || "").trim().toLowerCase() === normalizedSku
+        );
+        if (existsSku) {
+          showErr("Ilyen cikkszám már létezik az adatbázisban (akár a nagy rendszerből, akár mobilról rögzítve). Adj meg egy másik kódot!");
+          return;
+        }
+      }
+
+      btnSave.disabled = true;
+      try{
+        await addDoc(collection(db, COL_PRODUCTS), {
+          sku,
+          name,
+          unit,
+          min: isNaN(min) ? 0 : min
+        });
+        form.reset();
+        inpUnit.value = "db";
+        inpSku.focus();
+      }catch(err){
+        showErr("Termék mentése sikertelen: " + (err?.message || err));
+      }finally{
+        btnSave.disabled = false;
+      }
+    });
+
+    btnClr.addEventListener("click", ()=>{
+      form.reset();
+      inpUnit.value = "db";
+      hideErr();
+      inpSku.focus();
+    });
+
+    // ===== Vonalkód / QR olvasó (ZXing) =====
+    const scanBackdrop = $("#scan-backdrop");
+    const scanVideo    = $("#scan-video");
+    const btnScan      = $("#btn-scan");
+    const scanClose    = $("#scan-close");
+    const scanCancel   = $("#scan-cancel");
+
+    let codeReader = null;
+    let currentStream = null;
+
+    function openScanModal(){
+      if(!window.ZXing){
+        showErr("A vonalkód olvasó könyvtár nem töltődött be.");
+        return;
+      }
+      hideErr();
+      if(!codeReader){
+        codeReader = new ZXing.BrowserMultiFormatReader();
+      }
+      scanBackdrop.classList.add("show");
+      startScan();
+    }
+
+    function closeScanModal(){
+      stopScan();
+      scanBackdrop.classList.remove("show");
+    }
+
+    async function startScan(){
+      try{
+        // Ha már van futó stream, ne indítsuk újra
+        if(currentStream){
+          return;
+        }
+        const videoInputDevices = await codeReader.listVideoInputDevices();
+        const deviceId = videoInputDevices.length ? videoInputDevices[0].deviceId : undefined;
+
+        codeReader.decodeFromVideoDevice(deviceId, "scan-video", (result, err)=>{
+          if(result){
+            const text = result.getText();
+            inpSku.value = text;
+            closeScanModal();
+            if(!inpName.value.trim()){
+              inpName.focus();
+            }
+          }
+          // hibát nem kötelező felhasználónak mutatni, ZXing belső hibái gyakoriak olvasás közben
+        });
+
+        // Videó streamet elmentjük, hogy ki tudjuk kapcsolni
+        const videoEl = scanVideo;
+        currentStream = videoEl.srcObject || null;
+      }catch(e){
+        showErr("Nem sikerült elindítani a kamerát: " + (e?.message || e));
+      }
+    }
+
+    function stopScan(){
+      if(codeReader){
+        try{ codeReader.reset(); }catch{}
+      }
+      if(currentStream){
+        try{
+          currentStream.getTracks().forEach(t=>t.stop());
+        }catch{}
+        currentStream = null;
+      }
+      if(scanVideo){
+        scanVideo.srcObject = null;
+      }
+    }
+
+    btnScan.addEventListener("click", openScanModal);
+    scanClose.addEventListener("click", closeScanModal);
+    scanCancel.addEventListener("click", closeScanModal);
+
+    scanBackdrop.addEventListener("click", (e)=>{
+      if(e.target === scanBackdrop){
+        closeScanModal();
+      }
+    });
+
+    // Kezdő fókusz
+    window.addEventListener("load", ()=>{
+      inpSku.focus();
+    });
+  </script>
+</body>
+</html>
