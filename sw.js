@@ -1,6 +1,6 @@
 const CACHE_NAME = 'mobil-torzsadat-v1';
 const PRECACHE_URLS = [
-  'mobile_torzsadat.html',
+  'index.html',
   'manifest.webmanifest',
   'sw.js',
   'icons/icon-192.png',
