@@ -27,6 +27,7 @@
 
     html{
       height:100%;
+      overscroll-behavior: none; /* Android/Chrome elastikus scroll tiltás */
     }
 
     body{
@@ -39,14 +40,7 @@
       align-items:stretch;
       justify-content:center;
       padding:16px;
-    }
-
-    /* Görgetés teljes tiltása scanner közben */
-    html.no-scroll,
-    body.no-scroll{
-      overflow:hidden;
-      height:100%;
-      touch-action:none;
+      overflow:hidden; /* alapból nincs görgetés */
     }
 
     .app{
@@ -264,7 +258,7 @@
       border:1px solid rgba(31,41,55,1);
       background:rgba(15,23,42,.98);
       max-height:190px;
-      overflow:auto;
+      overflow:auto;  /* ha egyszer több elem lesz, itt lehessen scrollozni */
       padding:4px 0;
     }
     .list-item{
@@ -304,7 +298,7 @@
       justify-content:center;
       z-index:40;
       padding:16px;
-      touch-action:none; /* ne lehessen elhúzni a képet */
+      touch-action:none;
     }
     .backdrop.show{
       display:flex;
@@ -476,7 +470,6 @@
       getAuth, signInAnonymously, onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    // Firestore config – ugyanaz, mint a nagy rendszernél
     const firebaseConfig = {
       apiKey: "AIzaSyAeoxtOe5Cleasm3KdeSHP9WDR3PkU-N1I",
       authDomain: "mosas-nyilvantartas.firebaseapp.com",
@@ -510,7 +503,7 @@
       errBox.classList.remove("show");
     }
 
-    // Időbélyeg a láblécben
+    // Lábléc infó
     const stampEl = $("#stamp");
     if(stampEl){
       const now = new Date();
@@ -520,7 +513,6 @@
 
     let products = [];
 
-    // Termékek betöltése – egyszeri lekérdezés (getDocs), nem realtime
     async function loadProducts(){
       try{
         const snap = await getDocs(
@@ -541,7 +533,7 @@
       cnt.textContent = "Termékek: " + products.length;
 
       box.innerHTML = "";
-      const last = products.slice(-5).reverse(); // csak az utolsó 5
+      const last = products.slice(-5).reverse();
 
       if(!last.length){
         const p = document.createElement("div");
@@ -569,11 +561,10 @@
 
     function escapeHtml(str){
       return String(str || "").replace(/[&<>\"']/g, c => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"
+        "&":"&amp;","<":"&lt;","~":"&gt;","\"":"&quot;","'":"&#039;"
       }[c] || c));
     }
 
-    // Anonim auth + termékek betöltése, ha bejelentkezett
     onAuthStateChanged(auth, (user)=>{
       if(!user){
         signInAnonymously(auth).catch(e =>
@@ -584,26 +575,15 @@
       }
     });
 
-    // ===== Görgetés lock/unlock scanner közben =====
-    let scrollLocked = false;
-    function lockScroll(){
-      scrollLocked = true;
-      document.body.classList.add('no-scroll');
-      document.documentElement.classList.add('no-scroll');
-    }
-    function unlockScroll(){
-      scrollLocked = false;
-      document.body.classList.remove('no-scroll');
-      document.documentElement.classList.remove('no-scroll');
-    }
-    function preventScroll(e){
-      if(scrollLocked){
-        e.preventDefault();
+    // ===== Globális touch scroll tiltás (kivéve .list) =====
+    window.addEventListener('touchmove', (e)=>{
+      const list = e.target.closest('.list');
+      if(!list){
+        e.preventDefault(); // se fel, se le ne lehessen "húzni" az oldalt
       }
-    }
-    window.addEventListener('touchmove', preventScroll, { passive:false });
+    }, { passive:false });
 
-    // Űrlap kezelése
+    // Űrlap
     const form    = $("#form-prod");
     const inpSku  = $("#prod-sku");
     const inpName = $("#prod-name");
@@ -626,7 +606,7 @@
         return;
       }
 
-      // 1) Lokális duplikáció ellenőrzés (gyors)
+      // 1) Lokális duplikáció ellenőrzés
       if (sku) {
         const normalizedSku = sku.toLowerCase();
         const existsLocal = products.some(p =>
@@ -637,7 +617,7 @@
           return;
         }
 
-        // 2) Firestore szintű ellenőrzés (biztos)
+        // 2) Firestore szintű ellenőrzés
         try{
           const qSnap = await getDocs(
             query(collection(db, COL_PRODUCTS), where('sku', '==', sku))
@@ -663,7 +643,6 @@
         form.reset();
         inpUnit.value = "db";
         inpSku.focus();
-        // új termék után lista frissítése
         loadProducts();
       }catch(err){
         showErr("Termék mentése sikertelen: " + (err?.message || err));
@@ -695,7 +674,6 @@
         return;
       }
       hideErr();
-      lockScroll();                     // 👈 görgetés letiltása
       scanBackdrop.classList.add("show");
       startScan();
     }
@@ -703,25 +681,22 @@
     function closeScanModal(){
       stopScan();
       scanBackdrop.classList.remove("show");
-      unlockScroll();                   // 👈 görgetés visszaengedése
     }
 
     async function startScan(){
       try{
         const { BrowserMultiFormatReader, NotFoundException } = window.ZXing;
 
-        stopScan(false); // előző olvasó/stream takarítása
+        stopScan(false);
 
         scanReader = new BrowserMultiFormatReader();
 
-        // Mindig a hátsó (environment) kamerát kérjük
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" } }
         });
         scanStream = stream;
         scanVideo.srcObject = stream;
 
-        // ZXing a már futó videóból olvas, deviceId = null
         scanReader.decodeFromVideoDevice(null, "scan-video", (result, err)=>{
           if(result){
             const text = result.getText ? result.getText() : (result.text || "");
@@ -738,7 +713,6 @@
         });
       }catch(e){
         stopScan();
-        unlockScroll();
         showErr("Nem sikerült elindítani a kamerát: " + (e?.message || e));
       }
     }
@@ -759,7 +733,6 @@
       }
       if(hide){
         scanBackdrop.classList.remove("show");
-        unlockScroll();
       }
     }
 
@@ -775,7 +748,8 @@
 
     // Kezdő fókusz
     window.addEventListener("load", ()=>{
-      inpSku.focus();
+      const inpSku = document.querySelector("#prod-sku");
+      if(inpSku) inpSku.focus();
     });
   </script>
 
