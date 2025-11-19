@@ -546,7 +546,7 @@
       cnt.textContent = "Termékek: " + products.length;
 
       box.innerHTML = "";
-      const last = products.slice(-20).reverse(); // utolsó 20
+      const last = products.slice(-5).reverse(); // utolsó 5
 
       if(!last.length){
         const p = document.createElement("div");
