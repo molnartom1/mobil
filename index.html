@@ -355,7 +355,6 @@
       justify-content:flex-end;
       gap:8px;
     }
-
   </style>
 </head>
 <body>
@@ -479,7 +478,7 @@
       getAuth, signInAnonymously, onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    // UGYANAZ a config, mint a “nagy” rendszerben
+    // ⬇️ UGYANAZ a config, mint a nagy rendszerben
     const firebaseConfig = {
       apiKey: "AIzaSyAeoxtOe5Cleasm3KdeSHP9WDR3PkU-N1I",
       authDomain: "mosas-nyilvantartas.firebaseapp.com",
@@ -505,7 +504,6 @@
     const COL_PRODUCTS = "mosas_products";
 
     const $  = (sel) => document.querySelector(sel);
-    const fmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 2 });
 
     const errBox  = $("#err");
     const errText = $("#err-text");
@@ -648,7 +646,7 @@
     const scanCancel   = $("#scan-cancel");
 
     let codeReader = null;
-    let currentStream = null;
+    let preferredCameraId = null; // 👈 itt jegyezzük meg a választott kamerát
 
     function openScanModal(){
       if(!window.ZXing){
@@ -670,36 +668,21 @@
 
     async function startScan(){
       try{
-        // Ha már van futó stream, ne indítsuk újra
-        if(currentStream){
-          return;
+        if(!codeReader) return;
+
+        // Ha még nincs választott kamera, most döntjük el (hátsó preferált)
+        if(!preferredCameraId){
+          const devices = await codeReader.listVideoInputDevices();
+          if(!devices.length){
+            showErr("Nem található kamera az eszközön.");
+            closeScanModal();
+            return;
+          }
+          const back = devices.find(d => /back|rear|hát/i.test(d.label || ""));
+          preferredCameraId = (back || devices[0]).deviceId;
         }
-        // Választott kamera megőrzése
-if (!window.preferredCameraId) {
-  const cams = await codeReader.listVideoInputDevices();
 
-  // hátsó kamera előnyben
-  const backCam = cams.find(c => /back|rear/i.test(c.label));
-  window.preferredCameraId = backCam ? backCam.deviceId : (cams[0]?.deviceId);
-}
-
-codeReader.decodeFromVideoDevice(window.preferredCameraId, "scan-video", (result, err) => {
-  if(result){
-    const text = result.getText();
-    inpSku.value = text;
-
-    // Ha sikeres olvasás → kamera ID mentése
-    if (result) {
-      window.preferredCameraId = result.deviceId || window.preferredCameraId;
-    }
-
-    closeScanModal();
-    if(!inpName.value.trim()){
-      inpName.focus();
-    }
-  }
-});
-        codeReader.decodeFromVideoDevice(deviceId, "scan-video", (result, err)=>{
+        await codeReader.decodeFromVideoDevice(preferredCameraId, "scan-video", (result, err)=>{
           if(result){
             const text = result.getText();
             inpSku.value = text;
@@ -708,26 +691,17 @@ codeReader.decodeFromVideoDevice(window.preferredCameraId, "scan-video", (result
               inpName.focus();
             }
           }
-          // hibát nem kötelező felhasználónak mutatni, ZXing belső hibái gyakoriak olvasás közben
         });
 
-        // Videó streamet elmentjük, hogy ki tudjuk kapcsolni
-        const videoEl = scanVideo;
-        currentStream = videoEl.srcObject || null;
       }catch(e){
         showErr("Nem sikerült elindítani a kamerát: " + (e?.message || e));
+        closeScanModal();
       }
     }
 
     function stopScan(){
       if(codeReader){
         try{ codeReader.reset(); }catch{}
-      }
-      if(currentStream){
-        try{
-          currentStream.getTracks().forEach(t=>t.stop());
-        }catch{}
-        currentStream = null;
       }
       if(scanVideo){
         scanVideo.srcObject = null;
