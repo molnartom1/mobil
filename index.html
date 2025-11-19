@@ -24,6 +24,11 @@
       --backdrop:rgba(15,23,42,.85);
     }
     *{box-sizing:border-box;}
+
+    html{
+      height:100%;
+    }
+
     body{
       margin:0;
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;
@@ -35,9 +40,12 @@
       justify-content:center;
       padding:16px;
     }
-    /* Görgetés tiltása scanner közben */
+
+    /* Görgetés teljes tiltása scanner közben */
+    html.no-scroll,
     body.no-scroll{
       overflow:hidden;
+      height:100%;
       touch-action:none;
     }
 
@@ -576,6 +584,25 @@
       }
     });
 
+    // ===== Görgetés lock/unlock scanner közben =====
+    let scrollLocked = false;
+    function lockScroll(){
+      scrollLocked = true;
+      document.body.classList.add('no-scroll');
+      document.documentElement.classList.add('no-scroll');
+    }
+    function unlockScroll(){
+      scrollLocked = false;
+      document.body.classList.remove('no-scroll');
+      document.documentElement.classList.remove('no-scroll');
+    }
+    function preventScroll(e){
+      if(scrollLocked){
+        e.preventDefault();
+      }
+    }
+    window.addEventListener('touchmove', preventScroll, { passive:false });
+
     // Űrlap kezelése
     const form    = $("#form-prod");
     const inpSku  = $("#prod-sku");
@@ -668,7 +695,7 @@
         return;
       }
       hideErr();
-      document.body.classList.add('no-scroll'); // görgetés tiltása
+      lockScroll();                     // 👈 görgetés letiltása
       scanBackdrop.classList.add("show");
       startScan();
     }
@@ -676,7 +703,7 @@
     function closeScanModal(){
       stopScan();
       scanBackdrop.classList.remove("show");
-      document.body.classList.remove('no-scroll'); // görgetés visszaengedése
+      unlockScroll();                   // 👈 görgetés visszaengedése
     }
 
     async function startScan(){
@@ -711,6 +738,7 @@
         });
       }catch(e){
         stopScan();
+        unlockScroll();
         showErr("Nem sikerült elindítani a kamerát: " + (e?.message || e));
       }
     }
@@ -731,7 +759,7 @@
       }
       if(hide){
         scanBackdrop.classList.remove("show");
-        document.body.classList.remove('no-scroll');
+        unlockScroll();
       }
     }
 
