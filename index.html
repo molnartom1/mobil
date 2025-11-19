@@ -638,15 +638,15 @@
       inpSku.focus();
     });
 
-    // ===== Vonalkód / QR olvasó (ZXing) =====
+    // ===== Vonalkód / QR olvasó (ZXing) – ugyanaz az elv, mint a nagy rendszeren =====
     const scanBackdrop = $("#scan-backdrop");
     const scanVideo    = $("#scan-video");
     const btnScan      = $("#btn-scan");
     const scanClose    = $("#scan-close");
     const scanCancel   = $("#scan-cancel");
 
-    let codeReader = null;
-    let preferredCameraId = null; // 👈 itt jegyezzük meg a választott kamerát
+    let scanReader = null;
+    let scanStream = null;
 
     function openScanModal(){
       if(!window.ZXing){
@@ -654,9 +654,6 @@
         return;
       }
       hideErr();
-      if(!codeReader){
-        codeReader = new ZXing.BrowserMultiFormatReader();
-      }
       scanBackdrop.classList.add("show");
       startScan();
     }
@@ -668,49 +665,63 @@
 
     async function startScan(){
       try{
-        if(!codeReader) return;
+        const { BrowserMultiFormatReader, NotFoundException } = window.ZXing;
 
-        // Ha még nincs választott kamera, most döntjük el (hátsó preferált)
-        if(!preferredCameraId){
-          const devices = await codeReader.listVideoInputDevices();
-          if(!devices.length){
-            showErr("Nem található kamera az eszközön.");
-            closeScanModal();
-            return;
-          }
-          const back = devices.find(d => /back|rear|hát/i.test(d.label || ""));
-          preferredCameraId = (back || devices[0]).deviceId;
-        }
+        // ha volt előző reader/stream, takarítsuk el
+        stopScan(false);
 
-        await codeReader.decodeFromVideoDevice(preferredCameraId, "scan-video", (result, err)=>{
+        scanReader = new BrowserMultiFormatReader();
+
+        // Itt kérjük a KAMERÁT – mindig environment/back preferált
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } }
+        });
+        scanStream = stream;
+        scanVideo.srcObject = stream;
+
+        // ZXing a már futó videóból olvas, deviceId = null
+        scanReader.decodeFromVideoDevice(null, "scan-video", (result, err)=>{
           if(result){
-            const text = result.getText();
-            inpSku.value = text;
-            closeScanModal();
-            if(!inpName.value.trim()){
-              inpName.focus();
+            const text = result.getText ? result.getText() : (result.text || "");
+            if(text){
+              inpSku.value = text;
+              closeScanModal();
+              if(!inpName.value.trim()){
+                inpName.focus();
+              }
             }
+          }else if(err && !(err instanceof NotFoundException)){
+            console.error(err);
           }
         });
-
       }catch(e){
+        stopScan();
         showErr("Nem sikerült elindítani a kamerát: " + (e?.message || e));
-        closeScanModal();
       }
     }
 
-    function stopScan(){
-      if(codeReader){
-        try{ codeReader.reset(); }catch{}
+    function stopScan(hide = true){
+      if(scanReader){
+        try{ scanReader.reset(); }catch{}
+        scanReader = null;
+      }
+      if(scanStream){
+        try{
+          scanStream.getTracks().forEach(t => t.stop());
+        }catch{}
+        scanStream = null;
       }
       if(scanVideo){
         scanVideo.srcObject = null;
       }
+      if(hide){
+        scanBackdrop.classList.remove("show");
+      }
     }
 
     btnScan.addEventListener("click", openScanModal);
-    scanClose.addEventListener("click", closeScanModal);
-    scanCancel.addEventListener("click", closeScanModal);
+    scanClose.addEventListener("click", ()=> closeScanModal());
+    scanCancel.addEventListener("click", ()=> closeScanModal());
 
     scanBackdrop.addEventListener("click", (e)=>{
       if(e.target === scanBackdrop){
