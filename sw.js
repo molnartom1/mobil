@@ -1,5 +1,6 @@
 const CACHE_NAME = 'mobil-torzsadat-v1';
 const PRECACHE_URLS = [
+  './',                 // kezdőlap
   'index.html',
   'manifest.webmanifest',
   'sw.js',
@@ -31,12 +32,12 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch – cache-first saját fájlokra, egyéb (Firebase, ZXing) hálózatból
+// Fetch – saját fájlokra cache-first, minden más (Firebase, ZXing) hálózatról
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Csak a saját originre használunk cache-t
-  if (url.origin === self.location.origin) {
+  // Csak a /mobil/ origin + path alatt cache-elünk
+  if (url.origin === self.location.origin && url.pathname.startsWith('/mobil/')) {
     event.respondWith(
       caches.match(event.request).then(cached => {
         return cached || fetch(event.request);
