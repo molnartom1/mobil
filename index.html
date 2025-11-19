@@ -674,9 +674,31 @@
         if(currentStream){
           return;
         }
-        const videoInputDevices = await codeReader.listVideoInputDevices();
-        const deviceId = videoInputDevices.length ? videoInputDevices[0].deviceId : undefined;
+        // Választott kamera megőrzése
+if (!window.preferredCameraId) {
+  const cams = await codeReader.listVideoInputDevices();
 
+  // hátsó kamera előnyben
+  const backCam = cams.find(c => /back|rear/i.test(c.label));
+  window.preferredCameraId = backCam ? backCam.deviceId : (cams[0]?.deviceId);
+}
+
+codeReader.decodeFromVideoDevice(window.preferredCameraId, "scan-video", (result, err) => {
+  if(result){
+    const text = result.getText();
+    inpSku.value = text;
+
+    // Ha sikeres olvasás → kamera ID mentése
+    if (result) {
+      window.preferredCameraId = result.deviceId || window.preferredCameraId;
+    }
+
+    closeScanModal();
+    if(!inpName.value.trim()){
+      inpName.focus();
+    }
+  }
+});
         codeReader.decodeFromVideoDevice(deviceId, "scan-video", (result, err)=>{
           if(result){
             const text = result.getText();
