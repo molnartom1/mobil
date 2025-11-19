@@ -1,14 +1,14 @@
-const CACHE_NAME = 'mobil-torzsadat-v1';
+const CACHE_NAME = 'mobil-torzsadat-v2';
+
 const PRECACHE_URLS = [
-  './',                 // kezdőlap
+  './',
   'index.html',
   'manifest.webmanifest',
-  'sw.js',
   'icons/icon-192.png',
   'icons/icon-512.png'
 ];
 
-// Telepítés – shell cache-elése
+// Telepítés – alap fájlok cache-elése
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
@@ -32,15 +32,41 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch – saját fájlokra cache-first, minden más (Firebase, ZXing) hálózatról
+// Fetch – index.html-re NETWORK-FIRST, minden másra CACHE-FIRST
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Csak a /mobil/ origin + path alatt cache-elünk
+  // Csak a /mobil/ alatt foglalkozunk vele
   if (url.origin === self.location.origin && url.pathname.startsWith('/mobil/')) {
+
+    // Navigációs kérések (app shell: index.html)
+    if (
+      event.request.mode === 'navigate' ||
+      url.pathname === '/mobil/' ||
+      url.pathname.endsWith('/mobil/index.html')
+    ) {
+      event.respondWith(
+        fetch(event.request)
+          .then(response => {
+            // frisset betesszük a cache-be
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+            return response;
+          })
+          .catch(() => caches.match(event.request))
+      );
+      return;
+    }
+
+    // Egyéb statikus fájlok – cache-first
     event.respondWith(
       caches.match(event.request).then(cached => {
-        return cached || fetch(event.request);
+        if (cached) return cached;
+        return fetch(event.request).then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          return response;
+        });
       })
     );
   }
