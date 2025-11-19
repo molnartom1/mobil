@@ -35,6 +35,12 @@
       justify-content:center;
       padding:16px;
     }
+    /* Görgetés tiltása scanner közben */
+    body.no-scroll{
+      overflow:hidden;
+      touch-action:none;
+    }
+
     .app{
       width:100%;
       max-width:480px;
@@ -290,6 +296,7 @@
       justify-content:center;
       z-index:40;
       padding:16px;
+      touch-action:none; /* ne lehessen elhúzni a képet */
     }
     .backdrop.show{
       display:flex;
@@ -661,6 +668,7 @@
         return;
       }
       hideErr();
+      document.body.classList.add('no-scroll'); // görgetés tiltása
       scanBackdrop.classList.add("show");
       startScan();
     }
@@ -668,6 +676,7 @@
     function closeScanModal(){
       stopScan();
       scanBackdrop.classList.remove("show");
+      document.body.classList.remove('no-scroll'); // görgetés visszaengedése
     }
 
     async function startScan(){
@@ -722,6 +731,7 @@
       }
       if(hide){
         scanBackdrop.classList.remove("show");
+        document.body.classList.remove('no-scroll');
       }
     }
 
