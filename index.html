@@ -413,9 +413,7 @@
         <span id="prod-count" class="muted">Termékek: –</span>
       </div>
 
-      <div class="list" id="list-last">
-        <!-- Utolsó termékek ide kerülnek -->
-      </div>
+      <div class="list" id="list-last"></div>
 
       <div class="stamp">
         <span id="stamp"></span>
@@ -450,14 +448,20 @@
   <script type="module">
     import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
-      getFirestore, collection, addDoc, onSnapshot, query, orderBy,
-      enableIndexedDbPersistence
+      getFirestore,
+      collection,
+      addDoc,
+      query,
+      orderBy,
+      enableIndexedDbPersistence,
+      getDocs,
+      where
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import {
       getAuth, signInAnonymously, onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    // UGYANAZ a config, mint a nagy rendszernél
+    // Firestore config – ugyanaz, mint a nagy rendszernél
     const firebaseConfig = {
       apiKey: "AIzaSyAeoxtOe5Cleasm3KdeSHP9WDR3PkU-N1I",
       authDomain: "mosas-nyilvantartas.firebaseapp.com",
@@ -474,14 +478,8 @@
     enableIndexedDbPersistence(db).catch(()=>{});
 
     const auth = getAuth();
-    onAuthStateChanged(auth, (user)=>{
-      if(!user){
-        signInAnonymously(auth).catch(e => showErr("Anonim bejelentkezés sikertelen: " + (e?.message || e)));
-      }
-    });
 
     const COL_PRODUCTS = "mosas_products";
-
     const $  = (sel) => document.querySelector(sel);
 
     const errBox  = $("#err");
@@ -507,15 +505,18 @@
 
     let products = [];
 
-    // Realtime terméklista – közös adatbázis a nagy rendszerrel
-    onSnapshot(
-      query(collection(db, COL_PRODUCTS), orderBy("name")),
-      (snap)=>{
+    // Termékek betöltése – egyszeri lekérdezés (getDocs), nem realtime
+    async function loadProducts(){
+      try{
+        const snap = await getDocs(
+          query(collection(db, COL_PRODUCTS), orderBy("name"))
+        );
         products = snap.docs.map(d => ({ id:d.id, ...d.data() }));
         renderLastProducts();
-      },
-      (err)=> showErr("Terméklista szinkron hiba: " + (err?.message || err))
-    );
+      }catch(err){
+        showErr("Terméklista betöltési hiba: " + (err?.message || err));
+      }
+    }
 
     function renderLastProducts(){
       const box = $("#list-last");
@@ -525,7 +526,7 @@
       cnt.textContent = "Termékek: " + products.length;
 
       box.innerHTML = "";
-      const last = products.slice(-5).reverse(); // 🔹 csak az utolsó 5
+      const last = products.slice(-5).reverse(); // csak az utolsó 5
 
       if(!last.length){
         const p = document.createElement("div");
@@ -557,6 +558,17 @@
       }[c] || c));
     }
 
+    // Anonim auth + termékek betöltése, ha bejelentkezett
+    onAuthStateChanged(auth, (user)=>{
+      if(!user){
+        signInAnonymously(auth).catch(e =>
+          showErr("Anonim bejelentkezés sikertelen: " + (e?.message || e))
+        );
+      }else{
+        loadProducts();
+      }
+    });
+
     // Űrlap kezelése
     const form    = $("#form-prod");
     const inpSku  = $("#prod-sku");
@@ -580,14 +592,28 @@
         return;
       }
 
-      // Duplikált cikkszám ellenőrzés – teljes adatbázisra
+      // 1) Lokális duplikáció ellenőrzés (gyors)
       if (sku) {
         const normalizedSku = sku.toLowerCase();
-        const existsSku = products.some(p =>
+        const existsLocal = products.some(p =>
           String(p.sku || "").trim().toLowerCase() === normalizedSku
         );
-        if (existsSku) {
-          showErr("Ilyen cikkszám már létezik az adatbázisban. Adj meg egy másik kódot!");
+        if (existsLocal) {
+          showErr("Ilyen cikkszám már létezik az adatbázisban (lokális lista alapján). Adj meg egy másik kódot!");
+          return;
+        }
+
+        // 2) Firestore szintű ellenőrzés (biztos)
+        try{
+          const qSnap = await getDocs(
+            query(collection(db, COL_PRODUCTS), where('sku', '==', sku))
+          );
+          if(!qSnap.empty){
+            showErr("Ilyen cikkszám már létezik az adatbázisban (Firestore alapján is). Adj meg egy másik kódot!");
+            return;
+          }
+        }catch(err){
+          showErr("Nem sikerült ellenőrizni a cikkszám egyediségét: " + (err?.message || err));
           return;
         }
       }
@@ -603,6 +629,8 @@
         form.reset();
         inpUnit.value = "db";
         inpSku.focus();
+        // új termék után lista frissítése
+        loadProducts();
       }catch(err){
         showErr("Termék mentése sikertelen: " + (err?.message || err));
       }finally{
