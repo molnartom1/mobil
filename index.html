@@ -533,7 +533,7 @@
       cnt.textContent = "Termékek: " + products.length;
 
       box.innerHTML = "";
-      const last = products.slice(-5).reverse();
+      const last = products.slice(-5);
 
       if(!last.length){
         const p = document.createElement("div");
