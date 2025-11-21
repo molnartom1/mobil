@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<title>MOBIL SZKENNER</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#020617"/>
+<style>
+ body{margin:0;background:#020617;color:#fff;font-family:sans-serif;padding:10px;}
+ h1{font-size:20px;margin:0 0 10px;}
+ #video{width:100%;border:2px solid #334155;border-radius:12px;background:#000;}
+ .box{margin-top:12px;padding:10px;border:1px solid #334155;border-radius:12px;background:#0f172a;}
+ input{width:100%;padding:8px;border-radius:8px;border:1px solid #475569;background:#020617;color:#fff;}
+ button{padding:10px 16px;border:0;border-radius:8px;background:#38bdf8;color:#000;font-weight:bold;margin-top:8px;width:100%;}
+ .small{font-size:12px;color:#94a3b8;margin-top:4px;}
+</style>
+</head>
+<body>
+
+<h1>MOBIL SZKENNER</h1>
+<div class="small">A PC-ről kapott session ID-hez csatlakozik.</div>
+
+<div class="box">
+  <label>Session ID</label>
+  <input id="session" placeholder="példa: abcd1234">
+  <button id="connect">Csatlakozás</button>
+</div>
+
+<div class="box">
+  <video id="video" playsinline autoplay></video>
+  <div class="small">Irányítsd a kamerát a vonalkódra.</div>
+  <div class="small">Utolsó találat: <span id="last">-</span></div>
+</div>
+
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAeoxtOe5Cleasm3KdeSHP9WDR3PkU-N1I",
+  authDomain: "mosas-nyilvantartas.firebaseapp.com",
+  projectId: "mosas-nyilvantartas",
+  storageBucket: "mosas-nyilvantartas.appspot.com",
+  messagingSenderId: "38259241645",
+  appId: "1:38259241645:web:26070b1d0686def9f00c24"
+};
+if (!getApps().length) initializeApp(firebaseConfig);
+const db = getFirestore();
+
+const video = document.getElementById("video");
+const lastEl = document.getElementById("last");
+
+let sessionId = null;
+let reader = null;
+let stream = null;
+let lastCode = "";
+
+document.getElementById("connect").onclick = async () => {
+  sessionId = document.getElementById("session").value.trim();
+  if (!sessionId) { alert("Adj meg session ID-t"); return; }
+  startScanner();
+};
+
+async function startScanner() {
+  if (stream) stopScanner();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } }
+    });
+    video.srcObject = stream;
+  } catch(e){ alert("Kamera hiba: " + e); return; }
+
+  const { BrowserMultiFormatReader } = window.ZXing;
+  reader = new BrowserMultiFormatReader();
+  reader.decodeFromVideoDevice(null, video, (res, err)=>{
+    if (res) {
+      const code = res.getText();
+      if (code !== lastCode) {
+        lastCode = code;
+        lastEl.textContent = code;
+        sendCode(code);
+      }
+    }
+  });
+}
+
+async function sendCode(code){
+  try{
+    await addDoc(collection(db, "mosas_scan_sessions", sessionId, "items"), {
+      code, createdAt: serverTimestamp()
+    });
+  }catch(e){ console.error(e); }
+}
+
+function stopScanner(){
+  if (reader) reader.reset();
+  if (stream) {
+    stream.getTracks().forEach(t=>t.stop());
+    stream = null;
+  }
+}
+window.onbeforeunload = stopScanner;
+</script>
+
+</body>
+</html>
